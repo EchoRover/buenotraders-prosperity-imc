@@ -1,0 +1,142 @@
+# Changelog
+
+Chronological record of all significant project changes.
+
+---
+
+## 2026-04-03
+- Created `e1_v1.py` — first competition-ready trader
+  - Compatible imports: works on both competition platform (`from datamodel`) and backtester
+  - Position limits corrected to 50 (was 80 in backtester defaults, 50 on competition)
+  - EMERALDS: fixed fair value 10000, take+make, spread=7, skew=0.10
+  - TOMATOES: linear regression fair value (10-tick lookback), spread=6, skew=0.20
+  - **Parameter sweep**: tested 27+ spread/skew combinations
+  - **Backtest result: 23,671 SeaShells** (88% better than example_trader's 12,604)
+  - Ready for submission — awaiting live score comparison
+- Analyzed 3 live competition logs from `userdatadump/`:
+  - e1_v1 intermediate (45757): 863 SeaShells
+  - Teammate algo (45684): 1,076 SeaShells  
+  - e1_v1 FINAL (45769): **1,232 SeaShells** (best)
+  - CRITICAL: backtester overestimates by ~10-20x vs live
+  - TOMATOES linreg strategy outperforms by +32% vs teammate
+- Created `e1_v2.py` — improvements based on live log analysis
+  - Fixed position limit bug (separate buy/sell budgets from starting position)
+  - TOMATOES: VWAP microprice instead of simple mid
+  - TOMATOES: Stricter take threshold (fair±3, was ±1) — reduces bad trades
+  - TOMATOES: Trend-aware spread biasing via linreg slope (±1 tick cap)
+  - Parameter sweep: 27 combos tested, best at TE=3, TC=1, TM=1.0
+  - **Backtest: 24,385** (v1 was 23,671, +3%)
+  - More importantly: TOMATOES day-to-day consistency improved (6,076+6,125 vs 6,579+4,908)
+  - File size: 5.6KB
+- **e1_v2 LIVE RESULT: 1,226** (submission 45811) — basically identical to v1 (1,232)
+  - EMERALDS identical (558). TOMATOES slightly worse (668 vs 674)
+  - v2 trades less (1,690 vs 1,859 active ticks) but with better win rate (52% vs 49%)
+  - Conclusion: conservative filters don't help — need better signals, not tighter filters
+- Community research completed (Discord/web scraping):
+  - **CRITICAL: position limits may be 80, not 50** — backtester source confirms 80, teammate used 50 (possibly wrong)
+  - Hidden fair value = "Wall Mid" (avg of bid/ask walls with large quantities)
+  - Backtester `--match-trades worse` flag gives more realistic results (18,620 vs 23,671 default)
+  - Matching engine sequence confirmed: makers → takers → your algo → your orders match → passive sits 1 tick
+  - Documented all findings in `docs/research-notes.md`
+- Created probe algos in `models/`:
+  - `e1_p1.py` — fill rate mapper (posts at 7 price levels per side to map fill rates)
+  - `e1_p2.py` — hidden fair value detector (buys 1 unit and holds, observes PnL changes)
+- Removed premature e1_v3 and e1_v1_limit80 — v3 will be built AFTER probe data comes back
+- Rule added: never modify submitted models, always create new versions
+- **e1_p1 (limit=50) LIVE RESULT: 396** (submission 45834)
+  - **CRITICAL FINDING: EMERALD fills ONLY at 9999/10001** — wider prices get ZERO fills
+  - This means our EMERALD_SPREAD=7 is suboptimal — should be 1
+  - TOMATO fills spread across wide price range (4979-5009) — different dynamics
+  - Saved to `logs/e1_p1_50_45834.json/.log`
+- **e1_p1 (limit=80 test) LIVE RESULT** (submission 45855)
+  - **CONFIRMED: POSITION LIMIT IS 80** — reached position 80 on EMERALDS, orders not cancelled
+  - Our v1/v2 used limit=50 — we were using 37.5% LESS capacity than allowed
+  - EMERALD fills: buy at 9999 (30), buy at 10008 (74, aggressive test), sell at 10001 (39)
+  - Saved to `logs/e1_p1_80_45855.json/.log`
+- **e1_p2 LIVE RESULT** (submission 45868)
+  - Hidden fair value ≈ mid-price (diff = 0.04 avg, std 0.86)
+  - No Wall Mid trick in tutorial round — mid is fine
+  - Saved to `logs/e1_p2_45868.json/.log`
+- **Created e1_v3** — data-driven rebuild from all probe findings:
+  - LIMITS = 80 (confirmed), E_SPREAD = 1 (confirmed), T_SPREAD = 6 (kept)
+  - Backtester shows lower (13,625 vs 23,671) because backtester rewards fake wide fills
+  - Probe data is ground truth — live will tell the real story
+- **e1_v3 LIVE RESULT: 863** (submission 45886) — WORSE than v1
+  - EMERALDS crashed: 189 vs v1's 558. Spread=1 gets 28 fills × 6.75 = 189 vs spread=7 gets 16 fills × 34.88 = 558
+  - **Probe finding was MISLEADING**: when multiple levels available, bots pick ±1. But when only ±7 available, bots STILL fill at ±7 for 7x more profit per fill
+  - TOMATOES identical to v1 (674 vs 674) — limit=80 doesn't matter since position never exceeds ~17
+  - **Key lesson: wide EMERALD spread wins because profit-per-fill matters more than fill count**
+- Created `e1_v4.py` — v1 base + order book imbalance signal for TOMATOES
+  - New signal: `book_imbalance = (bid_vol - ask_vol) / total_vol` adjusts fair value ±2 ticks
+  - EMERALDS: identical to v1 (proven spread=7)
+  - LIMITS = 80, position limit bug fixed
+  - Backtest: 23,764 (v1 = 23,671). TOMATOES more consistent across days (5,447 vs 4,908 on trending day)
+  - **LIVE: 1,232** (identical to v1). Imbalance signal had no net effect.
+- Deep analysis of all 4 versions + Arjun — see `docs/strategy-log.md`
+- Restructured project folders:
+  - `models/` — all trader algorithms + `REGISTRY.md` (score tracking)
+  - `logs/` — competition log dumps with clear naming
+  - `scripts/` — analysis utilities (future)
+  - Moved all models to `models/`, kept root copies for easy submission
+  - Created `models/REGISTRY.md` — single source of truth for all model scores
+  - Updated `CLAUDE.md` with full project structure and log processing workflow
+  - File size: 5.4KB (well under 100KB submission limit)
+- Reviewed teammate code in `Fiteaf/prosperity04.py` for reference
+  - Confirmed correct import is `from datamodel import ...` for competition platform
+  - Confirmed position limits are 50 per product
+- Established naming convention: all traders use `e1` prefix with versions (`e1_v1.py`, `e1_v2.py`, ...)
+- Updated `CLAUDE.md` with full competition details, backtester usage, and naming conventions
+- Deep research on winning teams: analyzed writeups from 2nd place (P2 + P3), 9th place (P3), 13th place (P2)
+  - Identified biggest historical edges: cross-year data reuse, insider bot ("Olivia") detection, hidden fair value discovery
+  - Documented infrastructure patterns of top teams (custom dashboards, grid search, position clearing)
+  - Documented what separates top 10 from top 500 teams
+  - All findings in `docs/research-notes.md` under "What Makes Top Teams Win"
+- Installed `prosperity4btx` (v0.0.2) backtester from PyPI into `gpy` environment
+  - Based on Jasper van Merle's Prosperity 3 backtester, packaged by Xeeshan
+  - Dependencies: jsonpickle (newly installed), ipython, orjson, tqdm, typer (all pre-existing)
+  - Package includes bundled round 0 tutorial data — matches our `data/tutorial/` CSVs
+- Created `data/round0/` directory with proper backtester file structure
+  - Copied tutorial CSVs from `data/tutorial/` into `data/round0/` (backtester expects `round{N}/` subdirectories)
+- Created `example_trader.py` — minimal market-making algorithm for backtester verification
+  - Midpoint-based quoting with position-aware inventory management
+  - EMERALDS: spread=2, TOMATOES: spread=3, quantity=10 per side
+  - Position limits enforced at 80 per product
+- Verified backtester runs successfully on both days of round 0:
+  - Day -2: EMERALDS 2,044 + TOMATOES 4,768 = 6,812
+  - Day -1: EMERALDS 2,224 + TOMATOES 3,567 = 5,791
+  - Total: 12,604 SeaShells across both days
+- Verified `--data` flag works with custom `data/` directory
+- Verified output log generation (saved to `backtests/*.log`)
+- Extracted tutorial data capsule (`Tutorial Round 1.zip`) to `data/tutorial/`
+  - 4 CSV files: prices and trades for 2 days (day -2 and day -1)
+  - Products: TOMATOES (TG01) and EMERALDS (TG02)
+  - Currency: XIRECS
+- Analyzed all tutorial data:
+  - EMERALDS: stable at 10,000 (96.8% of ticks), spread ~16 — classic market-making target
+  - TOMATOES: trending around ~5,000, std dev 14.58, spread ~13 — needs dynamic fair value
+  - Documented full analysis in `docs/research-notes.md`
+- Current algorithm score: 3,100 SeaShells (baseline)
+- Project initialized — empty `evan/` workspace created in team monorepo
+- Created `docs/` folder with documentation structure:
+  - `README.md` — index of all doc files and conventions
+  - `project-overview.md` — competition and team context
+  - `strategy-log.md` — trading strategy tracker
+  - `technical-log.md` — code/architecture decision log
+  - `research-notes.md` — market analysis and findings
+  - `changelog.md` — this file, master log of all changes
+- Created `CLAUDE.md` at project root with AI assistant instructions
+- Updated `CLAUDE.md` with mandatory documentation protocol:
+  - Every action must be logged
+  - No personal information to be committed (repo is shared with team)
+  - Timestamps and specificity required in all entries
+- Created `.claude/` directory for project-specific AI config
+- **Deep research session**: Studied IMC Prosperity competition in depth
+  - Fetched and analyzed Prosperity 4 datamodel.py (complete API classes)
+  - Read competition rules, timeline, prize structure
+  - Analyzed 5+ writeups from top Prosperity 3 teams (9th, 73rd, 588th globally)
+  - Analyzed Prosperity 2 writeups for historical pattern recognition
+  - Documented all findings in `docs/research-notes.md`
+  - Identified the recurring round structure: market-making → baskets → options → arbitrage → advanced
+  - Catalogued winning strategies per round type
+  - Found community backtester for Prosperity 4
+- Updated `project-overview.md` with full competition details and timeline
