@@ -7,7 +7,7 @@ except ImportError:
 import json
 from typing import Dict, List
 
-LIMITS = {"EMERALDS": 80, "TOMATOES": 70}
+LIMITS = {"EMERALDS": 80, "TOMATOES": 75}
 T_ADVOL = 16
 T_REVERSION_BETA = -0.229
 
@@ -165,8 +165,8 @@ class Trader:
         if baa is not None: askp=baa-1
         else: askp=fair+2
         askp=max(askp,fair+1)
-        if pos>=70: bb=0
-        if pos<=-70: sb=0
+        if pos>=75: bb=0
+        if pos<=-75: sb=0
         if bb>0: o.append(Order(P,bidp,bb))
         if sb>0: o.append(Order(P,askp,-sb))
         return o

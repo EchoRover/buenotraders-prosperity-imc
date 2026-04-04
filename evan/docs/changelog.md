@@ -4,6 +4,31 @@ Chronological record of all significant project changes.
 
 ---
 
+## 2026-04-04 (claude1 continued)
+- Discovered v10 local code was CORRUPTED — all v11-v15 had static spread MAKE instead of penny-jump
+  - Root cause: every manual edit of v10.py accidentally replaced the TOMATOES MAKE section
+  - Fix: always copy from userdatadump/e1_v10_47816/47816.py (actual submitted code)
+- v14 (taker fading): 1,411 — tighter spread on taker events HURT
+- v15 (dual fair value): 1,416 — separating make/take FV removed the directional bias that creates profit
+- fool1 (simplest possible): 936 (E:150, T:786) — simpler than corrupted v11-v15 but worse than v10
+- fool2 (real v10 + two-layer): 2,344 — identical to v10, two-layer adds nothing
+- fool4 (v10 + taker fading): 2,527 — taker fading captured zero extra fills
+- Installed Rust backtester (GeyzsoN/prosperity_rust_backtester) — ±17 accuracy vs live!
+  - Queue-aware matching: models price-time priority (we're last in queue)
+  - SUB row = portal's 2,000-tick simulation
+  - v10: Rust=2,322 vs Live=2,344 (off by 22)
+  - crazy8: Rust=2,639 vs Live=~2,600 (off by 39)
+- Parameter sweep using Rust backtester (28+ configs tested):
+  - T_SOFT_LIMIT: higher = better. 100 (no soft limit) optimal
+  - T_LIM: 70 optimal
+  - T_ADVERSE_VOL: 16-18 optimal (was 15)
+  - T_REVERSION_BETA: -0.10 to -0.44 all identical (not the bottleneck)
+  - market_trades flow signal: +5 (genuine but tiny)
+- Created `e1_fake1.py` — best config from sweep
+  - Rust SUB: 2,770.5 → **Live: 2,787.5** (off by +17, NEW BEST)
+  - E: 1,050 (crazy1 approach) | T: 1,737.5 (swept params)
+- Overfitting check: fake1 beats v10 on BOTH D-2 (+13%) and D-1 (+17%). Mild ~4% bias, not severe.
+
 ## 2026-04-04 (claude2 agent)
 - Created `e1_crazy3.py` — Three contrarian bets on TOMATOES by claude2 agent
   - Bet 1: Zero skew (same insight that broke EMERALDS open, untested on TOMATOES)

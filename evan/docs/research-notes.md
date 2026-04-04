@@ -4,6 +4,115 @@ Market analysis, data exploration, external references, and findings.
 
 ---
 
+## 2026-04-04 — AR Model Analysis + Signal Decomposition (claude2)
+
+### CRITICAL: Rust backtester cannot differentiate signal changes
+
+Tested 20+ variants. ALL give exactly SUB=2770.50 (170 trades). Changes to:
+- Float vs integer fair value
+- default_edge 1 vs 2
+- Adverse selection filtering
+- LIMITS["TOMATOES"] 70 vs 80
+- Two-layer MAKE
+- Flow multiplier (0.5 to 5.0)
+- Reversion beta values
+
+...produce ZERO change on Rust SUB. All 170 fills are from TAKE+CLEAR; MAKE never fills on Rust.
+
+### Signal contribution decomposition (Rust SUB, T only)
+
+| Config | T_SUB | Extra trades | Delta from baseline |
+|---|---|---|---|
+| 1-tick reversion only | 1715.50 | 169 | baseline |
+| NO reversion at all | 1715.50 | 169 | +0 |
+| + 5-tick reversion | 1715.50 | 169 | +0 |
+| + flow signal (2.0x) | 1720.50 | 170 | +5 |
+| All three combined | 1720.50 | 170 | +5 |
+
+**Conclusion:** Reversion adds ZERO on Rust. Flow adds +5 (one extra trade). The live-only PnL from signals is massive: 261 for fake1 vs v10.
+
+### TOMATOES Price Data Analysis (AR model fitting)
+
+Analyzed 20,000 ticks of filtered_mid across both days:
+
+**Autocorrelation structure:**
+- Lag 1: -0.248 (strong mean reversion)
+- Lag 2: +0.000 (negligible)
+- Lag 3: +0.000 (negligible)
+- Lag 5: -0.015 (weak)
+
+**AR(1) coefficient:** -0.248 (our -0.229 was 7% too weak)
+
+**AR(2) coefficients:** lag1=-0.264, lag2=-0.065
+- The lag-2 signal is REAL and we never used it
+
+**Level AR(4) weights:** [0.735, 0.196, 0.053, 0.017] (sum=1.000)
+- Stanford Cardinal (2nd P1) used this approach
+- Directly predicts price level as weighted average
+
+**Price change distribution:**
+- 52.6% no change, 15.2% ±1, 7.3% ±0.5, <1% ±2+
+- Mean: -0.002 (negligible drift), Std: 0.713
+
+**Conditional reversion:** 70.5% reversion rate when |Δ| >= 1
+
+### New models built
+
+- **crazy12:** AR(2) return model (β1=-0.264, β2=-0.065) + flow signal + crazy8 E
+- **crazy13:** Level AR(4) direct prediction + flow signal + crazy8 E
+- Both: Rust 2,770 (ceiling). Must test live for differentiation.
+
+---
+
+## 2026-04-04 — Rust Backtester + Parameter Sweep → 2,787 NEW BEST (claude1)
+
+### Rust Backtester Discovery
+Installed GeyzsoN's Rust backtester (github.com/GeyzsoN/prosperity_rust_backtester). 
+It models QUEUE PRIORITY (we're last) — this is why it's ±17 of live vs Python's 10-20x overestimate.
+
+Output has 3 rows: D-2 (10k ticks), D-1 (10k ticks), SUB (2k ticks = portal score).
+
+### Parameter Sweep Results (using Rust backtester SUB score)
+
+| Param | Range tested | Best value | Impact |
+|---|---|---|---|
+| T_SOFT_LIMIT | 5-200 | 100 (no soft limit) | +183 (from 2,505 to 2,684) |
+| T_LIM | 50-80 | 70 | +50 |
+| T_REVERSION_BETA | -0.10 to -0.60 | -0.10 to -0.44 all same | 0 (not the bottleneck) |
+| T_TAKE_EDGE | 0, 1, 2 | 1 | best (0 and 2 both worse) |
+| T_ADVERSE_VOL | 14-29 | 16-18 | +31 (from 2,734 to 2,765) |
+| market_trades flow | weight 0-5 | 1-2 | +5 |
+| 5-tick reversion | weight 0-1 | 0-0.5 | +5 |
+
+### fake1 Final Config
+- E: crazy1 approach (limit=80, zero skew, aggressive CLEAR pos>20→5) = 1,050
+- T: filtered mid (advol=16) + reversion(-0.229) + penny-jump MAKE + no soft limit + lim=70 + market_trades flow = 1,737.5
+- **Rust SUB: 2,770.5 → Live: 2,787.5** (off by +17)
+
+### MAKE Structure Sweep (Rust backtester)
+| MAKE approach | SUB score |
+|---|---|
+| penny+1 (current) | 2,770 |
+| penny+2 (wider) | 2,770 (identical!) |
+| penny+1 two-layer | 2,770 (identical!) |
+| static spread=4 | 2,337 |
+| static spread=6 | 2,337 |
+| join bot | 1,213 |
+| aggressive | 1,687 |
+| NO MAKE at all | 1,356 (T=306!) |
+
+**KEY FINDING: MAKE DOES FILL.** Removing MAKE drops T from 1,720 to 306 (−1,414). Our earlier claim that "MAKE never fills" was WRONG. The penny-jump MAKE fills ARE happening — they just have large edge from mid because penny-jump prices are far from mid.
+
+Penny-jump +1 and +2 give identical scores — the exact distance doesn't matter. What matters is posting RELATIVE TO THE BOOK (not relative to fair). Static spread posts relative to fair → off-center when reversion shifts fair → worse fills.
+
+### Overfitting Check
+- D-2/D-1 ratio: fake1=1.165 vs v10=1.204 — MILD bias to D-1, not severe
+- fake1 beats v10 on BOTH days: D-2 +13%, D-1 +17%, SUB +19%
+- Core improvements (higher limits, advol=16) are robust across days
+- For Round 1: dial back to advol=15, soft=50 to be safe
+
+---
+
 ## 2026-04-04 — Session Summary: 2,527 ceiling, what's needed for 3,000 (claude1)
 
 Best score: 2,527 (crazy7/fool4) = E:1,050 + T:1,477

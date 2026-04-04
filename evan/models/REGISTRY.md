@@ -23,7 +23,15 @@ All models, their scores, and what changed. Single source of truth.
 | e1_v9 | — | — | — | ~2,100 | 867 | ~1,233 | matched LADDOO |
 | **e1_v10** | — | — | — | **2,344** | 867 | 1,477 | **filtered mid + reversion = breakthrough** |
 | **e1_crazy1** | — | — | — | **2,065** | **1,050** | 1,015 | **EMERALD 1,050! zero skew + limit=80** |
-| **e1_v11** | — | — | — | **???** | ??? | ??? | **v10 + A-S dynamic spread** |
+| e1_v11 | — | — | — | 1,172 | 867 | 305 | A-S dynamic spread CRASHED |
+| e1_v12 | — | — | — | 1,599 | 1,050 | 549 | CORRUPTED T code (static spread) |
+| e1_v13 | — | — | — | 1,599 | 1,050 | 549 | same corruption |
+| e1_v14 | — | — | — | 1,411 | 867 | 544 | taker fading + corrupted |
+| e1_v15 | — | — | — | 1,416 | 867 | 549 | dual FV + corrupted |
+| e1_fool1 | — | — | — | 936 | 150 | 786 | simplest possible |
+| e1_fool2 | — | — | — | 2,344 | 867 | 1,477 | = v10 (two-layer neutral) |
+| e1_fool4 | — | — | — | 2,527 | 1,050 | 1,477 | crazy1 E + v10 T |
+| **e1_fake1** | Rust:2,770 | 1,050 | 1,720 | **2,787** | **1,050** | **1,738** | **NEW BEST — Rust sweep optimized** |
 | **e1_crazy2** | — | — | — | **1,793** | **1,050** | 743 | **limit=80 KILLED TOMATOES (-734 vs v10)** |
 | **e1_crazy3** | — | — | — | **921** | **1,050** | **-129** | **all 3 bets failed: spread=8 + zero skew + no reversion = NEGATIVE T** |
 | **e1_crazy4** | — | — | — | **1,598** | **1,050** | 548 | adverse filter + penny-jump didn't help |
@@ -34,6 +42,12 @@ All models, their scores, and what changed. Single source of truth.
 | **e1_crazy9** | — | — | — | **2,505** | **1,050** | 1,455 | TAKE_EDGE=0 HURT (-156 T). Don't remove take edge. |
 | **e1_crazy10** | — | — | — | **1,686** | 872 | 814 | **CRASHED. E_TAKE=0 bad, dual FV killed directional edge** |
 | **e1_crazy11** | — | — | — | **???** | ??? | ??? | **NOVEL: adaptive beta — bot learns optimal reversion in real-time** |
+| **e1_crazy12** | Rust:2,770 | 1,050 | 1,720 | **2,371** | **1,050** | **1,321** | **AR(2) HURT: T-417 vs fake1. LIMITS=80 + stronger reversion = BAD** |
+| **e1_crazy13** | Rust:2,770 | 1,050 | 1,720 | — | — | — | **Level AR(4): weighted avg [0.735,0.196,0.053,0.017] from OLS** |
+| **e1_crazy14** | Rust:2,770 | 1,050 | 1,720 | — | — | — | **BASELINE: fake1 T exact + crazy8 E, LIMITS=70. Should = 2,787** |
+| **e1_crazy15** | Rust:2,765 | 1,050 | 1,715 | — | — | — | **STRIPPED: pure filtered_mid, NO reversion/flow. Mr Nobody approach** |
+| **e1_crazy16** | — | — | — | — | — | — | exact copy of real fake1 (48474.py) |
+| **e1_crazy17** | — | — | — | **2,787** | **1,050** | **1,737** | **= fake1. Two-layer MAKE neutral. CONFIRMED BASELINE.** |
 
 ## Key Insight: v2 is NOT better than v1 live
 
@@ -121,6 +135,22 @@ v2 was more conservative (stricter takes, VWAP mid, trend shift) but the net res
   - Adverse filter on takes, mm_mid fair value
   - Limit=80, hard brake ±60, aggressive CLEAR at ±40→20
   - Two-layer 65/35, L2_offset=1
+
+### e1_crazy12.py (claude2 agent)
+- **AR(2) data-fitted reversion model** — FIRST bot with coefficients from actual P4 TOMATOES data
+- AR(1) true coefficient: -0.248 (we were using -0.229 from P2 STARFRUIT)
+- AR(2) adds lag-2 signal: -0.065 (new information, never used in any previous bot)
+- Combined AR(2) fit: β1=-0.264, β2=-0.065
+- EMERALDS: crazy8 exact (1,050), TOMATOES: AR(2) + flow signal + penny-jump
+- Rust: 2,770 (same ceiling). Live: should outperform fake1 due to better directional prediction
+
+### e1_crazy13.py (claude2 agent)
+- **Level AR(4) model** — completely different paradigm from return-based reversion
+- Directly predicts price as weighted average: 0.735*m_t + 0.196*m_{t-1} + 0.053*m_{t-2} + 0.017*m_{t-3}
+- Weights from OLS regression on TOMATOES filtered_mid data
+- Same approach as Stanford Cardinal (2nd place P1, AR(4) on price levels)
+- EMERALDS: crazy8 exact (1,050), TOMATOES: Level AR(4) + flow signal + penny-jump
+- Rust: 2,770 (same ceiling). Live: highest variance — could be breakthrough or neutral
 
 ## Key Findings
 
