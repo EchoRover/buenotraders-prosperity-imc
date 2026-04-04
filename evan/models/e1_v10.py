@@ -169,21 +169,40 @@ class Trader:
                     if q > 0: orders.append(Order(P, price, q)); buy_b -= q; pos += q
                 else: break
 
-        # MAKE — static spread (NOT penny-jump — Lakshan proved it fails on TOMATOES)
-        skew = round(pos * 0.15)
-        bid_price = fair - 6 - skew
-        ask_price = fair + 6 - skew
+        # MAKE — penny-jump like Linear Utility
+        best_ask_above = None
+        for p in sorted(od.sell_orders.keys()):
+            if p > fair + T_DISREGARD:
+                best_ask_above = p; break
+        best_bid_below = None
+        for p in sorted(od.buy_orders.keys(), reverse=True):
+            if p < fair - T_DISREGARD:
+                best_bid_below = p; break
 
-        if pos >= 40: buy_b = 0
-        if pos <= -40: sell_b = 0
+        if best_bid_below is not None:
+            bid_price = best_bid_below + 1  # penny-jump
+        else:
+            bid_price = fair - T_DEFAULT_EDGE
+        bid_price = min(bid_price, fair - 1)
+
+        if best_ask_above is not None:
+            ask_price = best_ask_above - 1  # penny-jump
+        else:
+            ask_price = fair + T_DEFAULT_EDGE
+        ask_price = max(ask_price, fair + 1)
+
+        # Soft position limit
+        if pos > T_SOFT_LIMIT:
+            ask_price = max(ask_price - 1, fair + 1)
+        elif pos < -T_SOFT_LIMIT:
+            bid_price = min(bid_price + 1, fair - 1)
+
+        if pos >= 50: buy_b = 0
+        if pos <= -50: sell_b = 0
 
         if buy_b > 0:
-            l1 = max(1, int(buy_b * 0.65)); l2 = buy_b - l1
-            orders.append(Order(P, bid_price, l1))
-            if l2 > 0: orders.append(Order(P, bid_price - 2, l2))
+            orders.append(Order(P, bid_price, buy_b))
         if sell_b > 0:
-            l1 = max(1, int(sell_b * 0.65)); l2 = sell_b - l1
-            orders.append(Order(P, ask_price, -l1))
-            if l2 > 0: orders.append(Order(P, ask_price + 2, -l2))
+            orders.append(Order(P, ask_price, -sell_b))
 
         return orders
