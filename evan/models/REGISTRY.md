@@ -25,7 +25,15 @@ All models, their scores, and what changed. Single source of truth.
 | **e1_crazy1** | — | — | — | **2,065** | **1,050** | 1,015 | **EMERALD 1,050! zero skew + limit=80** |
 | **e1_v11** | — | — | — | **???** | ??? | ??? | **v10 + A-S dynamic spread** |
 | **e1_crazy2** | — | — | — | **1,793** | **1,050** | 743 | **limit=80 KILLED TOMATOES (-734 vs v10)** |
-| **e1_crazy3** | — | — | — | **???** | ??? | ??? | **claude2: zero skew + spread=8 + conditional reversion** |
+| **e1_crazy3** | — | — | — | **921** | **1,050** | **-129** | **all 3 bets failed: spread=8 + zero skew + no reversion = NEGATIVE T** |
+| **e1_crazy4** | — | — | — | **1,598** | **1,050** | 548 | adverse filter + penny-jump didn't help |
+| **e1_crazy5** | — | — | — | — | — | — | skipped — EMA smoothing would break v10 T |
+| **e1_crazy6** | — | — | — | **1,599** | **1,050** | 549 | v10 on-disk T (static spread) + crazy1 E → interference confirmed |
+| **e1_crazy7** | — | — | — | **2,527** | **1,050** | **1,477** | **NEW BEST! Real v10 T + crazy1 E. No interference.** |
+| **e1_crazy8** | — | — | — | **2,661** | **1,050** | **1,611** | **NEW BEST! T+134 from raised limits. E stayed 1,050.** |
+| **e1_crazy9** | — | — | — | **2,505** | **1,050** | 1,455 | TAKE_EDGE=0 HURT (-156 T). Don't remove take edge. |
+| **e1_crazy10** | — | — | — | **1,686** | 872 | 814 | **CRASHED. E_TAKE=0 bad, dual FV killed directional edge** |
+| **e1_crazy11** | — | — | — | **???** | ??? | ??? | **NOVEL: adaptive beta — bot learns optimal reversion in real-time** |
 
 ## Key Insight: v2 is NOT better than v1 live
 

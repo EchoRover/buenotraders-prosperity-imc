@@ -4,6 +4,88 @@ Market analysis, data exploration, external references, and findings.
 
 ---
 
+## 2026-04-04 — Session Summary: 2,527 ceiling, what's needed for 3,000 (claude1)
+
+Best score: 2,527 (crazy7/fool4) = E:1,050 + T:1,477
+Target: 3,000 → need T:1,950 (+473)
+
+KEY FACTS:
+- TOMATOES is 100% TAKE fills. MAKE never fills (queue priority — we're last).
+- 122 takes, 83 winners (+1,820), 39 losers (-158), net +1,477
+- Spread capture is NEGATIVE. All profit is directional (post-fill price movement).
+- v10 code was CORRUPTED in local models/ — every v11-v15 had wrong MAKE code.
+- ALWAYS copy from userdatadump/e1_v10_47816/47816.py (the actual submitted file).
+- Two-layer, taker fading, signals — all tested properly now, none moved the needle.
+
+UNTESTED PATHS TO 3,000:
+1. state.market_trades data — genuinely unused data source
+2. Imbalance + reversion combined with REAL penny-jump (was tested with WRONG code before)
+3. Different TAKE_EDGE (0 instead of 1 — take AT fair, not fair-1)
+4. Completely different FV: use own_trades history or market_trades for prediction
+5. Accept 2,527 on tutorial and crush Round 1 with better preparation
+
+---
+
+## 2026-04-04 — PnL DECOMPOSITION: We're NOT market making (claude1)
+
+v10 TOMATOES PnL decomposition:
+- **Spread capture: -24** (NEGATIVE — we LOSE on every fill at execution)
+- **Post-fill favorable moves: +1,662** (our ENTIRE profit is directional)
+- **79.5% of fills are followed by favorable price moves** (only 20.5% adverse)
+
+**We are NOT a market maker. We are a directional trader disguised as one.**
+
+The filtered mid + reversion(-0.229) gives us a directional edge: when we buy, price subsequently rises 79.5% of the time. When we sell, price drops. This is the source of ALL our TOMATOES profit.
+
+**Implication for 3,000+:** Don't improve spreads, fills, or market making mechanics. Improve the DIRECTIONAL SIGNAL. Options:
+- Trade MORE when signal is strongest (tight spread = taker just hit = strongest reversion)
+- Trade LESS when signal is weakest (no taker activity = noise)
+- Find a better directional predictor than reversion(-0.229)
+- Increase position size when conviction is high
+
+---
+
+## 2026-04-04 — Discord: Price-Time Priority is WHY backtester fails (claude1)
+
+From Discord user Abad + Aryan Parekh:
+
+**We are the LAST market maker at each tick.** Our orders go to the BACK of the queue.
+
+What this means:
+- If we post at the SAME price as the bot, the bot's order gets filled FIRST (time priority)
+- "If you try to place quotes at best bid and best ask you basically never get filled" — LIVE
+- But backtesters DO fill them because they don't model queue position
+- **THIS IS THE BACKTESTER-LIVE GAP.** Not fill rate or data size — QUEUE PRIORITY.
+
+Why penny-jumping works: posting at bot_price + 1 creates a NEW price level where WE have time priority (we're the only order there). The taker fills us first because our price is better.
+
+Why joining the bot fails: posting at bot_price puts us BEHIND the bot in queue. The bot gets filled first. We only get filled if the taker's order is larger than the bot's volume at that level.
+
+**Implication for our spread:**
+- Wider spread (further from bot) = we're at a unique price level = guaranteed queue priority
+- But wider = less attractive to taker = fewer fills
+- The sweet spot is penny-jumping: 1 tick better than bot = best price AND queue priority
+
+**Why someone is stuck at 2,600:**
+"my strategy is simply getting free money whenever I can and then overbidding and undercutting by (+-1) when profitable and unwinding" — this is exactly our v10 approach. They cap at 2,600. The 3,000+ people do something beyond penny-jump + unwind.
+
+**What could the 3,000+ people be doing differently?**
+If penny-jump + CLEAR caps at ~2,500-2,600, the extra 500+ must come from:
+1. Better TAKE timing (only take when queue is favorable)
+2. More fills per taker event (larger quote volume captures more)
+3. Better position management that enables more cycles
+4. Or a completely different quoting structure we haven't considered
+
+---
+
+## 2026-04-04 — CRITICAL: Products are NOT independent (claude1)
+
+v12 AND v13 both score 1,599 (E:1050, T:549). Every time E=1050, T crashes. Products interfere. v10's 2,344 (E:867, T:1477) works because E=867 leaves market liquidity for T. Cannot combine "best E" + "best T" independently.
+
+Cross-product signal tested: DEAD (no correlation between EMERALD and TOMATO taker events). Taker timing: random (CV=0.99). Book shape as predictor: weak (8.5% vs 5.2%). None of these are the 3,000 breakthrough.
+
+---
+
 ## 2026-04-04 — v12 Results: CLEAR on TOMATOES is the killer (claude1 analysis)
 
 ### e1_v12 (submission 47912) — LIVE: 1,599 (E: 1,050, T: 549)
@@ -14,6 +96,28 @@ Market analysis, data exploration, external references, and findings.
 - The CLEAR aggressively sells at fair when pos>0, pushing position negative, then take piles on
 - **LESSON: TOMATOES should NOT have CLEAR.** The reversion + filtered mid handles position naturally.
 - v10 remains our best at 2,344 with TOMATOES position [-9, +44] — healthy without CLEAR
+
+---
+
+## 2026-04-04 — crazy3 Results: All 3 contrarian bets FAILED (claude2 analysis)
+
+### e1_crazy3 (submission 47927) — LIVE: 921 (E: 1,050, T: -129)
+- EMERALDS: 29 fills, 29W/0L — identical to crazy1, rock solid
+- TOMATOES: 1,936 active (96.8%), 955W (49.3%) / 981L (50.7%), avg win +9.82, avg loss -9.70, **edge/tick -0.067**
+- TOMATOES went NEGATIVE. We're losing money per trade.
+
+### Post-mortem: why each bet failed
+1. **Spread=8:** Too wide. Our quotes land behind bot makers (~fair±6.5). We only fill on large moves, which means we're often catching the wrong side of momentum. Spread=6 keeps us competitive with bots for priority.
+2. **Zero skew:** TOMATOES trends. Without skew, inventory accumulates in the trend direction with no correction. CLEAR alone can't keep up. Unlike EMERALDS (stable, mean-reverts), TOMATOES NEEDS skew to manage directional risk.
+3. **Conditional reversion (fade only on tight spread):** On 93% of ticks we used raw filtered mid with zero reversion. This means we're just FOLLOWING the price with no edge — market-making without a directional view is break-even minus costs. v10's constant reversion (-0.229) provides the edge that makes market-making profitable.
+
+### CRITICAL INSIGHT: EMERALDS vs TOMATOES are FUNDAMENTALLY different
+- EMERALDS (stable): zero skew works, wider spread works, aggressive CLEAR works, limit=80 works
+- TOMATOES (trending): NEEDS skew, NEEDS tight spread, NEEDS constant reversion, NEEDS limit=50
+- **Do NOT apply EMERALDS lessons to TOMATOES.** They are opposite products.
+
+### What still works for TOMATOES
+v10 remains the gold standard: filtered mid + constant reversion (-0.229) + spread=6 + skew=0.15 + limit=50 + hard=40 = **1,477**
 
 ---
 

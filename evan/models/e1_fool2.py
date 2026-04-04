@@ -1,10 +1,18 @@
 """
-e1_v13 — v10 exact code + EMERALDS zero skew (from crazy1).
+e1_fool2 — Built from ACTUAL submitted v10 (47816.py).
 
-ONLY CHANGE from v10: E_SKEW 0.12 → 0.00
-Everything else byte-for-byte identical to v10 which scored 2,344.
-crazy1's zero skew got EMERALDS from 867→1050.
-If this works: 1,050 + 1,477 = 2,527.
+ONE change: two-layer penny-jump on TOMATOES (65/35 split).
+v10 posts all volume at one penny-jump price.
+fool2 posts 65% at penny-jump, 35% one tick wider.
+This captures more taker volume per event without changing the mechanism.
+
+Base: v10 scored 2,344 (E:867, T:1477). Penny-jump MAKE is the key.
+Original v10 used:
+- Reversion beta: fair = filtered_mid * (1 + last_return * -0.229)
+- This is FUNDAMENTALLY different from our linreg/ensemble approach
+
+EMERALDS: v5 penny-jump + CLEAR (proven 867)
+TOMATOES: filtered mid + reversion + CLEAR + penny-jump for make
 """
 
 try:
@@ -90,7 +98,7 @@ class Trader:
 
         if pos > 25: bid_price -= 1; ask_price = max(ask_price - 1, FAIR + 1)
         elif pos < -25: ask_price += 1; bid_price = min(bid_price + 1, FAIR - 1)
-        skew = round(pos * 0.00)  # zero skew — crazy1's EMERALD breakthrough
+        skew = round(pos * 0.12)
         bid_price = min(bid_price - skew, FAIR - 1)
         ask_price = max(ask_price - skew, FAIR + 1)
 
@@ -166,21 +174,49 @@ class Trader:
                     if q > 0: orders.append(Order(P, price, q)); buy_b -= q; pos += q
                 else: break
 
-        # MAKE — static spread (NOT penny-jump — Lakshan proved it fails on TOMATOES)
-        skew = round(pos * 0.15)
-        bid_price = fair - 6 - skew
-        ask_price = fair + 6 - skew
+        # MAKE — penny-jump like Linear Utility
+        best_ask_above = None
+        for p in sorted(od.sell_orders.keys()):
+            if p > fair + T_DISREGARD:
+                best_ask_above = p; break
+        best_bid_below = None
+        for p in sorted(od.buy_orders.keys(), reverse=True):
+            if p < fair - T_DISREGARD:
+                best_bid_below = p; break
 
-        if pos >= 40: buy_b = 0
-        if pos <= -40: sell_b = 0
+        if best_bid_below is not None:
+            bid_price = best_bid_below + 1  # penny-jump
+        else:
+            bid_price = fair - T_DEFAULT_EDGE
+        bid_price = min(bid_price, fair - 1)
 
+        if best_ask_above is not None:
+            ask_price = best_ask_above - 1  # penny-jump
+        else:
+            ask_price = fair + T_DEFAULT_EDGE
+        ask_price = max(ask_price, fair + 1)
+
+        # Soft position limit
+        if pos > T_SOFT_LIMIT:
+            ask_price = max(ask_price - 1, fair + 1)
+        elif pos < -T_SOFT_LIMIT:
+            bid_price = min(bid_price + 1, fair - 1)
+
+        if pos >= 50: buy_b = 0
+        if pos <= -50: sell_b = 0
+
+        # Two-layer: 65% at penny-jump, 35% one tick wider
         if buy_b > 0:
-            l1 = max(1, int(buy_b * 0.65)); l2 = buy_b - l1
+            l1 = max(1, int(buy_b * 0.65))
+            l2 = buy_b - l1
             orders.append(Order(P, bid_price, l1))
-            if l2 > 0: orders.append(Order(P, bid_price - 2, l2))
+            if l2 > 0:
+                orders.append(Order(P, bid_price - 1, l2))
         if sell_b > 0:
-            l1 = max(1, int(sell_b * 0.65)); l2 = sell_b - l1
+            l1 = max(1, int(sell_b * 0.65))
+            l2 = sell_b - l1
             orders.append(Order(P, ask_price, -l1))
-            if l2 > 0: orders.append(Order(P, ask_price + 2, -l2))
+            if l2 > 0:
+                orders.append(Order(P, ask_price + 1, -l2))
 
         return orders

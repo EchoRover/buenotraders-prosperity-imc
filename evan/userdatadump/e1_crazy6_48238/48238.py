@@ -1,10 +1,19 @@
 """
-e1_v13 — v10 exact code + EMERALDS zero skew (from crazy1).
+e1_crazy6 — claude2 agent
+=========================
+THE DEFINITIVE TEST. Is the "interference" real?
 
-ONLY CHANGE from v10: E_SKEW 0.12 → 0.00
-Everything else byte-for-byte identical to v10 which scored 2,344.
-crazy1's zero skew got EMERALDS from 867→1050.
-If this works: 1,050 + 1,477 = 2,527.
+v14/v15 proved E=867 can ALSO get T=549. So T=549 isn't caused by
+E=1050 — it's caused by TOMATOES code changes. ANY change to v10's
+TOMATOES → T=549. Claude1 confirmed: "ANY change breaks it."
+
+crazy6 = v10's trade_tomatoes BYTE-FOR-BYTE + crazy1's EMERALDS.
+ZERO changes to TOMATOES. Not "same approach" — literally v10's code.
+
+If T=1,477: interference is FAKE, total = 2,527 (NEW BEST!)
+If T=549: interference is REAL, v10 at 2,344 is our ceiling.
+
+Author: claude2 agent
 """
 
 try:
@@ -15,17 +24,24 @@ except ImportError:
 import json
 from typing import Dict, List
 
-LIMITS = {"EMERALDS": 50, "TOMATOES": 50}
+# EMERALDS limit=80 (crazy1), TOMATOES limit=50 (v10 EXACT)
+LIMITS = {"EMERALDS": 80, "TOMATOES": 50}
 
-# Linear Utility's exact params for trending product
-T_ADVERSE_VOL = 15      # filter: only use levels with 15+ volume
-T_REVERSION_BETA = -0.229  # fade 22.9% of last move
+# v10's EXACT constants — DO NOT CHANGE THESE
+T_ADVERSE_VOL = 15
+T_REVERSION_BETA = -0.229
 T_TAKE_EDGE = 1
 T_CLEAR_EDGE = 0
-T_DISREGARD = 1         # ignore within 1 of fair for penny-jump
-T_JOIN_EDGE = 0          # never join, always penny (LU's starfruit setting)
-T_DEFAULT_EDGE = 2       # LU's min_edge for starfruit
-T_SOFT_LIMIT = 10        # shift quotes when pos > this
+T_DISREGARD = 1
+T_JOIN_EDGE = 0
+T_DEFAULT_EDGE = 2
+T_SOFT_LIMIT = 10
+
+# crazy1 EMERALDS constants
+E_FAIR = 10_000; E_TAKE_EDGE = 1; E_CLEAR_EDGE = 0
+E_DEFAULT_EDGE = 4; E_DISREGARD = 1; E_SKEW = 0.00
+E_SOFT_LIMIT = 25; E_L1_PCT = 0.65; E_L2_OFFSET = 1
+E_IMB_THRESH = 0.12; E_AGGRO_POS = 30; E_AGGRO_TARG = 15
 
 
 class Trader:
@@ -38,7 +54,7 @@ class Trader:
             except (json.JSONDecodeError, TypeError):
                 td = {}
 
-        result: Dict[str, List[Order]] = {}
+        result = {}
         for product in state.order_depths:
             od = state.order_depths[product]
             pos = state.position.get(product, 0)
@@ -49,58 +65,85 @@ class Trader:
 
         return result, 0, json.dumps(td, separators=(',', ':'))
 
+    # ══════════════════════════════════════════════════════════════
+    # EMERALDS — crazy1 (proven 1,050)
+    # ══════════════════════════════════════════════════════════════
+
     def trade_emeralds(self, od, pos):
-        FAIR = 10000; P = "EMERALDS"; orders = []
-        buy_b = LIMITS[P] - pos; sell_b = LIMITS[P] + pos
+        P = "EMERALDS"; FAIR = E_FAIR; LIM = LIMITS[P]
+        orders = []; buy_b = LIM - pos; sell_b = LIM + pos
 
         for price in sorted(od.sell_orders.keys()):
-            if price <= FAIR - 1 and buy_b > 0:
+            if price <= FAIR - E_TAKE_EDGE and buy_b > 0:
                 q = min(-od.sell_orders[price], buy_b)
                 orders.append(Order(P, price, q)); buy_b -= q; pos += q
             else: break
         for price in sorted(od.buy_orders.keys(), reverse=True):
-            if price >= FAIR + 1 and sell_b > 0:
+            if price >= FAIR + E_TAKE_EDGE and sell_b > 0:
                 q = min(od.buy_orders[price], sell_b)
                 orders.append(Order(P, price, -q)); sell_b -= q; pos -= q
             else: break
 
         if pos > 0 and sell_b > 0:
             for price in sorted(od.buy_orders.keys(), reverse=True):
-                if price >= FAIR and sell_b > 0 and pos > 0:
+                if price >= FAIR - E_CLEAR_EDGE and sell_b > 0 and pos > 0:
                     q = min(od.buy_orders[price], sell_b, pos)
                     if q > 0: orders.append(Order(P, price, -q)); sell_b -= q; pos -= q
                 else: break
         if pos < 0 and buy_b > 0:
             for price in sorted(od.sell_orders.keys()):
-                if price <= FAIR and buy_b > 0 and pos < 0:
+                if price <= FAIR + E_CLEAR_EDGE and buy_b > 0 and pos < 0:
                     q = min(-od.sell_orders[price], buy_b, -pos)
                     if q > 0: orders.append(Order(P, price, q)); buy_b -= q; pos += q
                 else: break
 
-        bid_price = FAIR - 4
-        for p in sorted(od.buy_orders.keys(), reverse=True):
-            if p < FAIR - 1:
-                bid_price = p + 1 if od.buy_orders[p] > 1 else p; break
-        bid_price = min(bid_price, FAIR - 1)
-        ask_price = FAIR + 4
-        for p in sorted(od.sell_orders.keys()):
-            if p > FAIR + 1:
-                ask_price = p - 1 if abs(od.sell_orders[p]) > 1 else p; break
-        ask_price = max(ask_price, FAIR + 1)
+        if pos > E_AGGRO_POS and sell_b > 0:
+            for price in sorted(od.buy_orders.keys(), reverse=True):
+                if price >= FAIR - 1 and sell_b > 0 and pos > E_AGGRO_TARG:
+                    q = min(od.buy_orders[price], sell_b, pos - E_AGGRO_TARG)
+                    if q > 0: orders.append(Order(P, price, -q)); sell_b -= q; pos -= q
+                else: break
+        if pos < -E_AGGRO_POS and buy_b > 0:
+            for price in sorted(od.sell_orders.keys()):
+                if price <= FAIR + 1 and buy_b > 0 and pos < -E_AGGRO_TARG:
+                    q = min(-od.sell_orders[price], buy_b, -pos - E_AGGRO_TARG)
+                    if q > 0: orders.append(Order(P, price, q)); buy_b -= q; pos += q
+                else: break
 
-        if pos > 25: bid_price -= 1; ask_price = max(ask_price - 1, FAIR + 1)
-        elif pos < -25: ask_price += 1; bid_price = min(bid_price + 1, FAIR - 1)
-        skew = round(pos * 0.00)  # zero skew — crazy1's EMERALD breakthrough
-        bid_price = min(bid_price - skew, FAIR - 1)
-        ask_price = max(ask_price - skew, FAIR + 1)
+        bid_p = FAIR - E_DEFAULT_EDGE
+        if od.buy_orders:
+            for p in sorted(od.buy_orders.keys(), reverse=True):
+                if p < FAIR - E_DISREGARD: bid_p = p + 1; break
+        bid_p = min(bid_p, FAIR - 1)
+        ask_p = FAIR + E_DEFAULT_EDGE
+        if od.sell_orders:
+            for p in sorted(od.sell_orders.keys()):
+                if p > FAIR + E_DISREGARD: ask_p = p - 1; break
+        ask_p = max(ask_p, FAIR + 1)
+
+        if pos > E_SOFT_LIMIT: bid_p -= 1; ask_p = max(ask_p - 1, FAIR + 1)
+        if pos < -E_SOFT_LIMIT: ask_p += 1; bid_p = min(bid_p + 1, FAIR - 1)
+
+        imb = self._obi(od)
+        if imb > E_IMB_THRESH: ask_p = max(ask_p - 1, FAIR + 1)
+        elif imb < -E_IMB_THRESH: bid_p = min(bid_p + 1, FAIR - 1)
+
+        bid_p = min(bid_p, FAIR - 1); ask_p = max(ask_p, FAIR + 1)
 
         if buy_b > 0:
-            l1 = max(1, int(buy_b * 0.65)); orders.append(Order(P, bid_price, l1))
-            if buy_b - l1 > 0: orders.append(Order(P, bid_price - 2, buy_b - l1))
+            l1 = max(1, int(buy_b * E_L1_PCT)); l2 = buy_b - l1
+            orders.append(Order(P, bid_p, l1))
+            if l2 > 0: orders.append(Order(P, bid_p - E_L2_OFFSET, l2))
         if sell_b > 0:
-            l1 = max(1, int(sell_b * 0.65)); orders.append(Order(P, ask_price, -l1))
-            if sell_b - l1 > 0: orders.append(Order(P, ask_price + 2, -(sell_b - l1)))
+            l1 = max(1, int(sell_b * E_L1_PCT)); l2 = sell_b - l1
+            orders.append(Order(P, ask_p, -l1))
+            if l2 > 0: orders.append(Order(P, ask_p + E_L2_OFFSET, -l2))
         return orders
+
+    # ══════════════════════════════════════════════════════════════
+    # TOMATOES — v10 EXACT CODE. DO NOT MODIFY.
+    # Copied verbatim from e1_v10.py trade_tomatoes method.
+    # ══════════════════════════════════════════════════════════════
 
     def trade_tomatoes(self, od, pos, td):
         P = "TOMATOES"; orders = []
@@ -184,3 +227,11 @@ class Trader:
             if l2 > 0: orders.append(Order(P, ask_price + 2, -l2))
 
         return orders
+
+    @staticmethod
+    def _obi(od) -> float:
+        if not od.buy_orders or not od.sell_orders: return 0.0
+        bv = sum(od.buy_orders.values())
+        av = sum(abs(v) for v in od.sell_orders.values())
+        t = bv + av
+        return (bv - av) / t if t > 0 else 0.0

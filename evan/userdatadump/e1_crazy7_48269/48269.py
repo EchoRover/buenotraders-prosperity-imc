@@ -1,13 +1,20 @@
 """
-e1_v10 — Linear Utility approach: filtered mid + reversion beta.
+e1_crazy7 — claude2 agent
+=========================
+v10 SUBMITTED code (47816.py) trade_tomatoes VERBATIM + crazy1 EMERALDS.
 
-2nd place team (Prosperity 2) used:
-- Filtered mid: only use order levels with 15+ volume for fair value
-- Reversion beta: fair = filtered_mid * (1 + last_return * -0.229)
-- This is FUNDAMENTALLY different from our linreg/ensemble approach
+The diff between submitted v10 and on-disk v10 shows the ENTIRE MAKE
+section was replaced. Submitted = penny-jump, on-disk = static spread.
+THIS is why every copy got T=549: wrong MAKE code.
 
-EMERALDS: v5 penny-jump + CLEAR (proven 867)
-TOMATOES: filtered mid + reversion + CLEAR + penny-jump for make
+Key differences in the REAL submitted v10 TOMATOES:
+  - Penny-jump MAKE (NOT static spread=6)
+  - Single-level orders (NOT two-layer 65/35)
+  - NO skew on MAKE (position managed by soft-limit quote shift only)
+  - Hard limit at pos>=50 (NOT 40)
+  - Soft limit at T_SOFT_LIMIT=10 shifts ask/bid by 1
+
+Author: claude2 agent
 """
 
 try:
@@ -18,17 +25,23 @@ except ImportError:
 import json
 from typing import Dict, List
 
-LIMITS = {"EMERALDS": 50, "TOMATOES": 50}
+LIMITS = {"EMERALDS": 80, "TOMATOES": 50}
 
-# Linear Utility's exact params for trending product
-T_ADVERSE_VOL = 15      # filter: only use levels with 15+ volume
-T_REVERSION_BETA = -0.229  # fade 22.9% of last move
+# v10 SUBMITTED constants — from 47816.py
+T_ADVERSE_VOL = 15
+T_REVERSION_BETA = -0.229
 T_TAKE_EDGE = 1
 T_CLEAR_EDGE = 0
-T_DISREGARD = 1         # ignore within 1 of fair for penny-jump
-T_JOIN_EDGE = 0          # never join, always penny (LU's starfruit setting)
-T_DEFAULT_EDGE = 2       # LU's min_edge for starfruit
-T_SOFT_LIMIT = 10        # shift quotes when pos > this
+T_DISREGARD = 1
+T_JOIN_EDGE = 0
+T_DEFAULT_EDGE = 2
+T_SOFT_LIMIT = 10
+
+# crazy1 EMERALDS constants
+E_FAIR = 10_000; E_TAKE_EDGE = 1; E_CLEAR_EDGE = 0
+E_DEFAULT_EDGE = 4; E_DISREGARD = 1; E_SKEW = 0.00
+E_SOFT_LIMIT = 25; E_L1_PCT = 0.65; E_L2_OFFSET = 1
+E_IMB_THRESH = 0.12; E_AGGRO_POS = 30; E_AGGRO_TARG = 15
 
 
 class Trader:
@@ -52,58 +65,84 @@ class Trader:
 
         return result, 0, json.dumps(td, separators=(',', ':'))
 
+    # ══════════════════════════════════════════════════════════════
+    # EMERALDS — crazy1 (proven 1,050)
+    # ══════════════════════════════════════════════════════════════
+
     def trade_emeralds(self, od, pos):
-        FAIR = 10000; P = "EMERALDS"; orders = []
-        buy_b = LIMITS[P] - pos; sell_b = LIMITS[P] + pos
+        P = "EMERALDS"; FAIR = E_FAIR; LIM = LIMITS[P]
+        orders = []; buy_b = LIM - pos; sell_b = LIM + pos
 
         for price in sorted(od.sell_orders.keys()):
-            if price <= FAIR - 1 and buy_b > 0:
+            if price <= FAIR - E_TAKE_EDGE and buy_b > 0:
                 q = min(-od.sell_orders[price], buy_b)
                 orders.append(Order(P, price, q)); buy_b -= q; pos += q
             else: break
         for price in sorted(od.buy_orders.keys(), reverse=True):
-            if price >= FAIR + 1 and sell_b > 0:
+            if price >= FAIR + E_TAKE_EDGE and sell_b > 0:
                 q = min(od.buy_orders[price], sell_b)
                 orders.append(Order(P, price, -q)); sell_b -= q; pos -= q
             else: break
 
         if pos > 0 and sell_b > 0:
             for price in sorted(od.buy_orders.keys(), reverse=True):
-                if price >= FAIR and sell_b > 0 and pos > 0:
+                if price >= FAIR - E_CLEAR_EDGE and sell_b > 0 and pos > 0:
                     q = min(od.buy_orders[price], sell_b, pos)
                     if q > 0: orders.append(Order(P, price, -q)); sell_b -= q; pos -= q
                 else: break
         if pos < 0 and buy_b > 0:
             for price in sorted(od.sell_orders.keys()):
-                if price <= FAIR and buy_b > 0 and pos < 0:
+                if price <= FAIR + E_CLEAR_EDGE and buy_b > 0 and pos < 0:
                     q = min(-od.sell_orders[price], buy_b, -pos)
                     if q > 0: orders.append(Order(P, price, q)); buy_b -= q; pos += q
                 else: break
 
-        bid_price = FAIR - 4
-        for p in sorted(od.buy_orders.keys(), reverse=True):
-            if p < FAIR - 1:
-                bid_price = p + 1 if od.buy_orders[p] > 1 else p; break
-        bid_price = min(bid_price, FAIR - 1)
-        ask_price = FAIR + 4
-        for p in sorted(od.sell_orders.keys()):
-            if p > FAIR + 1:
-                ask_price = p - 1 if abs(od.sell_orders[p]) > 1 else p; break
-        ask_price = max(ask_price, FAIR + 1)
+        if pos > E_AGGRO_POS and sell_b > 0:
+            for price in sorted(od.buy_orders.keys(), reverse=True):
+                if price >= FAIR - 1 and sell_b > 0 and pos > E_AGGRO_TARG:
+                    q = min(od.buy_orders[price], sell_b, pos - E_AGGRO_TARG)
+                    if q > 0: orders.append(Order(P, price, -q)); sell_b -= q; pos -= q
+                else: break
+        if pos < -E_AGGRO_POS and buy_b > 0:
+            for price in sorted(od.sell_orders.keys()):
+                if price <= FAIR + 1 and buy_b > 0 and pos < -E_AGGRO_TARG:
+                    q = min(-od.sell_orders[price], buy_b, -pos - E_AGGRO_TARG)
+                    if q > 0: orders.append(Order(P, price, q)); buy_b -= q; pos += q
+                else: break
 
-        if pos > 25: bid_price -= 1; ask_price = max(ask_price - 1, FAIR + 1)
-        elif pos < -25: ask_price += 1; bid_price = min(bid_price + 1, FAIR - 1)
-        skew = round(pos * 0.12)
-        bid_price = min(bid_price - skew, FAIR - 1)
-        ask_price = max(ask_price - skew, FAIR + 1)
+        bid_p = FAIR - E_DEFAULT_EDGE
+        if od.buy_orders:
+            for p in sorted(od.buy_orders.keys(), reverse=True):
+                if p < FAIR - E_DISREGARD: bid_p = p + 1; break
+        bid_p = min(bid_p, FAIR - 1)
+        ask_p = FAIR + E_DEFAULT_EDGE
+        if od.sell_orders:
+            for p in sorted(od.sell_orders.keys()):
+                if p > FAIR + E_DISREGARD: ask_p = p - 1; break
+        ask_p = max(ask_p, FAIR + 1)
+
+        if pos > E_SOFT_LIMIT: bid_p -= 1; ask_p = max(ask_p - 1, FAIR + 1)
+        if pos < -E_SOFT_LIMIT: ask_p += 1; bid_p = min(bid_p + 1, FAIR - 1)
+
+        imb = self._obi(od)
+        if imb > E_IMB_THRESH: ask_p = max(ask_p - 1, FAIR + 1)
+        elif imb < -E_IMB_THRESH: bid_p = min(bid_p + 1, FAIR - 1)
+
+        bid_p = min(bid_p, FAIR - 1); ask_p = max(ask_p, FAIR + 1)
 
         if buy_b > 0:
-            l1 = max(1, int(buy_b * 0.65)); orders.append(Order(P, bid_price, l1))
-            if buy_b - l1 > 0: orders.append(Order(P, bid_price - 2, buy_b - l1))
+            l1 = max(1, int(buy_b * E_L1_PCT)); l2 = buy_b - l1
+            orders.append(Order(P, bid_p, l1))
+            if l2 > 0: orders.append(Order(P, bid_p - E_L2_OFFSET, l2))
         if sell_b > 0:
-            l1 = max(1, int(sell_b * 0.65)); orders.append(Order(P, ask_price, -l1))
-            if sell_b - l1 > 0: orders.append(Order(P, ask_price + 2, -(sell_b - l1)))
+            l1 = max(1, int(sell_b * E_L1_PCT)); l2 = sell_b - l1
+            orders.append(Order(P, ask_p, -l1))
+            if l2 > 0: orders.append(Order(P, ask_p + E_L2_OFFSET, -l2))
         return orders
+
+    # ══════════════════════════════════════════════════════════════
+    # TOMATOES — VERBATIM from 47816.py (submitted v10, scored 1,477)
+    # ══════════════════════════════════════════════════════════════
 
     def trade_tomatoes(self, od, pos, td):
         P = "TOMATOES"; orders = []
@@ -206,3 +245,11 @@ class Trader:
             orders.append(Order(P, ask_price, -sell_b))
 
         return orders
+
+    @staticmethod
+    def _obi(od) -> float:
+        if not od.buy_orders or not od.sell_orders: return 0.0
+        bv = sum(od.buy_orders.values())
+        av = sum(abs(v) for v in od.sell_orders.values())
+        t = bv + av
+        return (bv - av) / t if t > 0 else 0.0
