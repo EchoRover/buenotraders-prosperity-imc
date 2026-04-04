@@ -19,8 +19,13 @@ All models, their scores, and what changed. Single source of truth.
 | e1_p3 | 23,756 | 14,420 | 9,335 | **1,523** | 867 | 656 | trend-riding hurt TOMATOES |
 | e1_v6 | 23,268 | 8,339 | 14,929 | **1,580** | 624 | 956 | asymmetric E = BAD |
 | **e1_v7** | 29,349 | 14,420 | 14,929 | **1,823** | 867 | 956 | best so far |
-| **e1_v8** | — | — | — | **???** | ??? | ??? | **LADDOO base + fade only** |
-| **e1_crazy1** | — | — | — | **???** | ??? | ??? | **claude2 agent: adverse filter + mm_mid + L5 ensemble** |
+| **e1_v8** | — | — | — | **1,646** | 867 | 779 | fade hurt live |
+| e1_v9 | — | — | — | ~2,100 | 867 | ~1,233 | matched LADDOO |
+| **e1_v10** | — | — | — | **2,344** | 867 | 1,477 | **filtered mid + reversion = breakthrough** |
+| **e1_crazy1** | — | — | — | **2,065** | **1,050** | 1,015 | **EMERALD 1,050! zero skew + limit=80** |
+| **e1_v11** | — | — | — | **???** | ??? | ??? | **v10 + A-S dynamic spread** |
+| **e1_crazy2** | — | — | — | **1,793** | **1,050** | 743 | **limit=80 KILLED TOMATOES (-734 vs v10)** |
+| **e1_crazy3** | — | — | — | **???** | ??? | ??? | **claude2: zero skew + spread=8 + conditional reversion** |
 
 ## Key Insight: v2 is NOT better than v1 live
 

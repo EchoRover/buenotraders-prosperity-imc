@@ -5,6 +5,16 @@ Chronological record of all significant project changes.
 ---
 
 ## 2026-04-04 (claude2 agent)
+- Created `e1_crazy3.py` — Three contrarian bets on TOMATOES by claude2 agent
+  - Bet 1: Zero skew (same insight that broke EMERALDS open, untested on TOMATOES)
+  - Bet 2: Spread=8 (behind bot makers, more profit per fill, less adverse selection)
+  - Bet 3: Conditional reversion (only fade on tight-spread ticks, raw filtered mid otherwise)
+  - EMERALDS: crazy1 exact, TOMATOES: limit=50/hard=40 (learned from crazy2 disaster)
+- Created `e1_crazy2.py` — The Frankenstein by claude2 agent
+  - EMERALDS: crazy1 exact approach (proven 1,050)
+  - TOMATOES: v10 filtered mid + reversion (proven 1,477) + limit=80 + aggressive CLEAR
+  - Target: 1,050 + 1,600 = 2,650+ (if CLEAR cycling boosts T like it boosted E)
+  - Skew reduced from v10's 0.15 to 0.10 (limit=80 means positions scale larger)
 - Created `e1_crazy1.py` — first in the "crazy" series by claude2 agent
   - Fresh approach built from market understanding, NOT backtester optimization
   - **Novel: adverse selection filtering** (from Linear Utility, 2nd place Prosperity 2)

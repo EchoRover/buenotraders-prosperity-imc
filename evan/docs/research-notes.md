@@ -4,6 +4,64 @@ Market analysis, data exploration, external references, and findings.
 
 ---
 
+## 2026-04-04 — v12 Results: CLEAR on TOMATOES is the killer (claude1 analysis)
+
+### e1_v12 (submission 47912) — LIVE: 1,599 (E: 1,050, T: 549)
+- EMERALDS: 1,050 — crazy1 approach works perfectly
+- TOMATOES: 549 — spiraled to position -105
+- **ROOT CAUSE:** v12 added a CLEAR phase to TOMATOES that v10 doesn't have
+- v10 TOMATOES has NO CLEAR — just TAKE + MAKE with filtered mid + reversion
+- The CLEAR aggressively sells at fair when pos>0, pushing position negative, then take piles on
+- **LESSON: TOMATOES should NOT have CLEAR.** The reversion + filtered mid handles position naturally.
+- v10 remains our best at 2,344 with TOMATOES position [-9, +44] — healthy without CLEAR
+
+---
+
+## 2026-04-04 — crazy2 Results: limit=80 KILLS TOMATOES (claude2 analysis)
+
+### e1_crazy2 (submission 47885) — LIVE: 1,793 (E: 1,050, T: 743)
+- Total: 1,793 (E: 1,050, T: 743)
+- EMERALDS: 29 fills, 29W/0L, avg +36.21/fill — **identical to crazy1, limit=80 E is stable**
+- TOMATOES: 1,837 active (91.9%), 936W (51.0%) / 901L (49.0%), avg win +5.60, avg loss -5.00, edge/tick +0.404
+- **TOMATOES HALVED from v10: 1,477 → 743 (-734, -49.7%)**
+
+### WHY: limit=80 is POISON for TOMATOES
+
+The v10 approach (filtered mid + reversion) works with limit=50 because the tight limit NATURALLY constrains position growth:
+- At pos=40, buy_b = 50-40 = 10 (barely buying)
+- Hard limit at 40 kills buying at pos≥40
+- Positions stay in tight range [-9, +44]
+
+With limit=80:
+- At pos=40, buy_b = 80-40 = 40 (STILL buying aggressively)
+- Hard brake at 60 is too late
+- Positions grow larger, amplifying losses when TOMATOES reverses
+
+The aggressive CLEAR (pos>40→20) tries to fix this but each clear at fair±1 COSTS 1 per unit. On TOMATOES, clearing 20 units costs ~20. If it clears multiple times per day, that's -100+ just on clearing costs. On EMERALDS this works because the next fill cycle earns +36. On TOMATOES the edge per cycle is much smaller (~0.5/tick), so clearing costs eat the profit.
+
+### CRITICAL LESSON
+**limit=80 works for STABLE products (EMERALDS), FAILS for TRENDING products (TOMATOES).**
+- EMERALDS: no trends, stable FV → larger capacity = more fills = more profit
+- TOMATOES: trends → larger capacity = larger inventory = larger losses on reversal
+- Don't try limit=80 on TOMATOES again. Keep limit=50 with hard_limit=40.
+
+### Implication for crazy3
+- EMERALDS: keep crazy1 (limit=80, zero skew, aggressive CLEAR) = 1,050
+- TOMATOES: use v10 EXACTLY (limit=50, filtered mid, reversion, hard_limit=40) = 1,477
+- Combined baseline = 2,527. Improve from THERE with spread/signal changes, NOT limit changes.
+
+---
+
+## 2026-04-04 — crazy1 Results (claude2 analysis)
+
+### e1_crazy1 (submission 47851) — LIVE: 2,065 (E: 1,050, T: 1,015)
+- Total: 2,065 (E: 1,050, T: 1,015)
+- EMERALDS: 29 fills, 29W/0L, avg +36.21/fill — **breakthrough: +183 over previous best (867)**
+- TOMATOES: 1,963 active (98.2%), 985W (50.2%) / 978L (49.8%), avg win +9.76, avg loss -8.79, edge/tick +0.517
+- Key: zero skew + limit=80 + aggressive CLEAR gave EMERALDS +21% improvement
+
+---
+
 ## 2026-04-03 — Community Intel & Critical Findings
 
 ### Discord Intel — Competitive Landscape (2026-04-04)

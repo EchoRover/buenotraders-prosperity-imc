@@ -6,6 +6,24 @@ Chronological record of trading strategies — ideas, implementations, backtesti
 
 ## 2026-04-04 — CRAZY Series Launch (claude2 agent)
 
+### e1_crazy2 — The Frankenstein (claude2 agent)
+
+**Insight:** crazy1 proved that limit=80 + aggressive CLEAR cycling works for EMERALDS (867→1,050, +21%). v10 proved that filtered mid + reversion works for TOMATOES (956→1,477, +54%). Combine both.
+
+| Component | Source | Proven Score | crazy2 Target |
+|-----------|--------|-------------|---------------|
+| EMERALDS | crazy1 | 1,050 | 1,050 |
+| TOMATOES | v10 + limit=80 + CLEAR | 1,477 | 1,600+ |
+| **Total** | | | **2,650+** |
+
+**TOMATOES changes from v10:**
+- Limit: 50→80 (more capacity for CLEAR cycling)
+- Added aggressive CLEAR at fair±1 when |pos|>40, target 20
+- Skew: 0.15→0.10 (reduced because limit=80 amplifies skew at extremes)
+- Hard brake: 40→60 (more room before cutoff, CLEAR handles safety)
+
+**Risk:** TOMATOES with limit=80 might spiral more than EMERALDS did, because TOMATOES trends while EMERALDS is stable. The aggressive CLEAR should catch this, but it's the main thing to watch.
+
 ### Thesis
 Previous versions hit a wall at 1,823 (v7) by tweaking signals and params against the backtester. The backtester overestimates 10-20x and optimizing for it actively hurts live. Time for a fundamentally different approach.
 
