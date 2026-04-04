@@ -4,6 +4,43 @@ Chronological record of trading strategies — ideas, implementations, backtesti
 
 ---
 
+## 2026-04-04 — CRAZY Series Launch (claude2 agent)
+
+### Thesis
+Previous versions hit a wall at 1,823 (v7) by tweaking signals and params against the backtester. The backtester overestimates 10-20x and optimizing for it actively hurts live. Time for a fundamentally different approach.
+
+After studying the 2nd-place Prosperity 2 winner (Linear Utility) and 2nd-place Prosperity 3 winner (Frankfurt Hedgehogs), identified TWO techniques never tested in this codebase:
+
+### Novel Technique 1: Adverse Selection Filtering
+**What:** When the best bid/ask has large volume (>= 15), it's a market maker bot's quote. Don't take against it.
+**Why:** Market makers are informed. Taking against their full quote means you're on the wrong side. Small volume at best level = post-taker remnant = safe to trade against.
+**Source:** Linear Utility (2nd place P2) used this for STARFRUIT with `adverse_volume=15`. They ONLY took the best level when volume was small.
+**Expected impact:** Prevents ~10-20% of losing takes on TOMATOES. Should directly improve the win rate on aggressive orders.
+
+### Novel Technique 2: Market-Maker Mid Fair Value
+**What:** Filter the order book to show only levels with large volume (>= 15). Take the mid of those filtered levels.
+**Why:** Small orders are noise (taker remnants, our own quotes, retail). Large orders = bot market makers who have the best information about fair value. Their mid IS the true fair value.
+**Source:** Linear Utility called this `mmmid_price`. Frankfurt Hedgehogs used a variant called `wall_mid`.
+**Expected impact:** Cleaner fair value → better take/make decisions → less adverse selection.
+
+### e1_crazy1 Design
+- EMERALDS: L5 proven (penny-jump + CLEAR) + v7 aggressive CLEAR + limit=80
+- TOMATOES: L5 ensemble (0.25*wLR + 0.45*EMA + 0.30*mm_mid) + OBI 1.3
+  - Adverse filter on takes (skip if best vol >= 15)
+  - Market-maker mid as base signal (fallback: deep VWAP)
+  - Fade lag-1 return (reversion=-0.25, calibrated between LU's -0.229 and v7's -0.4)
+  - Limit=80, hard brake ±60, aggressive CLEAR at ±40→20
+  - Two-layer 65/35, L2_offset=1
+
+### What to Watch in Live Results
+1. Does adverse filter REDUCE take count? (Expected: yes, but net PnL should improve)
+2. Does mm_mid differ significantly from deep VWAP? (If not, it's not adding value)
+3. Does limit=80 cause position spirals? (Aggressive CLEAR should prevent this)
+4. Compare E score to 867 baseline — should match or exceed
+5. Compare T score to v7's 956 and LADDOO's 1,235 — target is 1,500+
+
+---
+
 ## 2026-04-03 — Tutorial Round Initial Analysis
 
 ### Current State

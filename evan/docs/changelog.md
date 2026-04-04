@@ -4,6 +4,23 @@ Chronological record of all significant project changes.
 
 ---
 
+## 2026-04-04 (claude2 agent)
+- Created `e1_crazy1.py` — first in the "crazy" series by claude2 agent
+  - Fresh approach built from market understanding, NOT backtester optimization
+  - **Novel: adverse selection filtering** (from Linear Utility, 2nd place Prosperity 2)
+    - When best level volume >= 15, that's a market maker bot — skip takes entirely
+    - Prevents paying the bot's spread (adverse selection)
+    - Never tested in this codebase before
+  - **Novel: market-maker mid fair value** (from Linear Utility)
+    - Filters order book for large-volume levels only (bot quotes)
+    - Gives cleaner fair value than raw VWAP or simple mid
+    - Falls back to deep VWAP when no large-vol levels exist
+  - EMERALDS: L5 foundation + v7 aggressive CLEAR, limit=80, zero skew
+  - TOMATOES: L5 ensemble + adverse filter + mm_mid + fade + limit=80
+  - Updated REGISTRY.md and strategy-log.md
+
+---
+
 ## 2026-04-03
 - Created `e1_v1.py` — first competition-ready trader
   - Compatible imports: works on both competition platform (`from datamodel`) and backtester

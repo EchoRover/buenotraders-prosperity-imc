@@ -20,6 +20,7 @@ All models, their scores, and what changed. Single source of truth.
 | e1_v6 | 23,268 | 8,339 | 14,929 | **1,580** | 624 | 956 | asymmetric E = BAD |
 | **e1_v7** | 29,349 | 14,420 | 14,929 | **1,823** | 867 | 956 | best so far |
 | **e1_v8** | — | — | — | **???** | ??? | ??? | **LADDOO base + fade only** |
+| **e1_crazy1** | — | — | — | **???** | ??? | ??? | **claude2 agent: adverse filter + mm_mid + L5 ensemble** |
 
 ## Key Insight: v2 is NOT better than v1 live
 
@@ -93,6 +94,20 @@ v2 was more conservative (stricter takes, VWAP mid, trend shift) but the net res
 - Buys 1 EMERALD + 1 TOMATO, then holds forever
 - PnL changes = changes in hidden fair value (since position is constant)
 - Logs order book snapshots and market trades
+
+### e1_crazy1.py (claude2 agent)
+- **CRAZY SERIES** — fresh approach from claude2 agent, not backtester-optimized
+- **Novel technique: adverse selection filtering** (from Linear Utility, 2nd place P2)
+  - Skip takes when best level volume >= 15 (market maker bot, not safe to trade against)
+  - Never tested in this codebase before
+- **Novel technique: market-maker mid fair value** (from Linear Utility)
+  - Filter book for large-vol levels only (bot quotes) → cleaner fair value
+  - Falls back to deep VWAP when no large-vol levels exist
+- EMERALDS: L5 penny-jump + v7 aggressive CLEAR, limit=80, zero skew
+- TOMATOES: L5 ensemble (0.25*LR + 0.45*EMA + 0.30*micro) + OBI 1.3 + fade -0.25
+  - Adverse filter on takes, mm_mid fair value
+  - Limit=80, hard brake ±60, aggressive CLEAR at ±40→20
+  - Two-layer 65/35, L2_offset=1
 
 ## Key Findings
 

@@ -1,13 +1,11 @@
 """
-e1_v10 — Linear Utility approach: filtered mid + reversion beta.
+e1_v11 — v10 base + dynamic A-S spread + ensemble with filtered mid.
 
-2nd place team (Prosperity 2) used:
-- Filtered mid: only use order levels with 15+ volume for fair value
-- Reversion beta: fair = filtered_mid * (1 + last_return * -0.229)
-- This is FUNDAMENTALLY different from our linreg/ensemble approach
-
-EMERALDS: v5 penny-jump + CLEAR (proven 867)
-TOMATOES: filtered mid + reversion + CLEAR + penny-jump for make
+v10 scored 2,344 (our best). This builds on it with:
+1. Filtered mid as input to a smoothed ensemble (not raw to reversion)
+2. Avellaneda-Stoikov dynamic spread: wider when volatile, tighter when calm
+3. Time-decay position penalty (flatten more aggressively near end)
+4. Take edge=2 to reduce overtrading (v10 trades 2x LADDOO's volume)
 """
 
 try:
@@ -16,19 +14,22 @@ except ImportError:
     from prosperity4bt.datamodel import OrderDepth, TradingState, Order
 
 import json
+import math
 from typing import Dict, List
 
 LIMITS = {"EMERALDS": 50, "TOMATOES": 50}
 
-# Linear Utility's exact params for trending product
-T_ADVERSE_VOL = 15      # filter: only use levels with 15+ volume
-T_REVERSION_BETA = -0.229  # fade 22.9% of last move
-T_TAKE_EDGE = 1
-T_CLEAR_EDGE = 0
-T_DISREGARD = 1         # ignore within 1 of fair for penny-jump
-T_JOIN_EDGE = 0          # never join, always penny (LU's starfruit setting)
-T_DEFAULT_EDGE = 2       # LU's min_edge for starfruit
-T_SOFT_LIMIT = 10        # shift quotes when pos > this
+# A-S params for TOMATOES
+T_GAMMA = 0.05          # risk aversion
+T_TOTAL_TICKS = 2000    # session length
+T_MIN_SPREAD = 4        # floor
+T_MAX_SPREAD = 10       # ceiling
+T_TAKE_EDGE = 2         # reduced from 1 to cut overtrading
+T_SKEW = 0.15
+T_HARD_LIM = 40
+T_ADVERSE_VOL = 15
+T_EMA_ALPHA = 0.20
+T_REVERSION = -0.229
 
 
 class Trader:
@@ -48,11 +49,12 @@ class Trader:
             if product == "EMERALDS":
                 result[product] = self.trade_emeralds(od, pos)
             elif product == "TOMATOES":
-                result[product] = self.trade_tomatoes(od, pos, td)
+                result[product] = self.trade_tomatoes(od, pos, td, state.timestamp)
 
         return result, 0, json.dumps(td, separators=(',', ':'))
 
     def trade_emeralds(self, od, pos):
+        """Same penny-jump + CLEAR as v10."""
         FAIR = 10000; P = "EMERALDS"; orders = []
         buy_b = LIMITS[P] - pos; sell_b = LIMITS[P] + pos
 
@@ -105,11 +107,10 @@ class Trader:
             if sell_b - l1 > 0: orders.append(Order(P, ask_price + 2, -(sell_b - l1)))
         return orders
 
-    def trade_tomatoes(self, od, pos, td):
+    def trade_tomatoes(self, od, pos, td, timestamp):
         P = "TOMATOES"; orders = []
 
-        # FILTERED MID: only use levels with 15+ volume
-        # This finds the market maker's quotes, filtering noise
+        # Filtered mid
         filtered_bid = None
         for p in sorted(od.buy_orders.keys(), reverse=True):
             if od.buy_orders[p] >= T_ADVERSE_VOL:
@@ -118,8 +119,6 @@ class Trader:
         for p in sorted(od.sell_orders.keys()):
             if abs(od.sell_orders[p]) >= T_ADVERSE_VOL:
                 filtered_ask = p; break
-
-        # Fallback to best bid/ask if no large levels
         if filtered_bid is None:
             filtered_bid = max(od.buy_orders.keys()) if od.buy_orders else None
         if filtered_ask is None:
@@ -127,23 +126,54 @@ class Trader:
         if filtered_bid is None or filtered_ask is None:
             return orders
 
-        filtered_mid = (filtered_bid + filtered_ask) / 2
+        fmid = (filtered_bid + filtered_ask) / 2
 
-        # Track for reversion
-        prev_mid = td.get("pm", filtered_mid)
-        td["pm"] = filtered_mid
+        # EMA on filtered mid
+        prev_ema = td.get("te", fmid)
+        ema = T_EMA_ALPHA * fmid + (1 - T_EMA_ALPHA) * prev_ema
+        td["te"] = ema
 
-        # REVERSION FAIR VALUE — Linear Utility's formula
+        # Track history for volatility estimation
+        hist = td.get("h", [])
+        hist.append(fmid)
+        if len(hist) > 25:
+            hist = hist[-25:]
+        td["h"] = hist
+
+        # Reversion signal
+        prev_mid = td.get("pm", fmid)
+        td["pm"] = fmid
+        reversion_adj = 0
         if prev_mid != 0:
-            last_return = (filtered_mid - prev_mid) / prev_mid
-            pred_return = last_return * T_REVERSION_BETA
-            fair = round(filtered_mid * (1 + pred_return))
+            last_return = fmid - prev_mid
+            reversion_adj = last_return * T_REVERSION
+
+        # Ensemble fair value: blend filtered mid, EMA, and reversion
+        if len(hist) >= 8:
+            fair = 0.40 * (fmid + reversion_adj) + 0.35 * ema + 0.25 * fmid
         else:
-            fair = round(filtered_mid)
+            fair = fmid
+
+        fair = round(fair)
+
+        # Dynamic spread from Avellaneda-Stoikov
+        # sigma = recent volatility
+        if len(hist) >= 5:
+            returns = [hist[i] - hist[i-1] for i in range(max(1, len(hist)-10), len(hist))]
+            sigma_sq = sum(r*r for r in returns) / len(returns) if returns else 1.0
+        else:
+            sigma_sq = 2.0  # default
+
+        # Time remaining fraction
+        t_frac = max(0.01, 1.0 - (timestamp / (T_TOTAL_TICKS * 100)))
+
+        # A-S optimal spread
+        as_spread = T_GAMMA * sigma_sq * t_frac + 2 / T_GAMMA * 0.1  # simplified
+        spread = int(max(T_MIN_SPREAD, min(T_MAX_SPREAD, round(as_spread + 4))))
 
         buy_b = LIMITS[P] - pos; sell_b = LIMITS[P] + pos
 
-        # TAKE
+        # TAKE (with higher edge threshold)
         for price in sorted(od.sell_orders.keys()):
             if price <= fair - T_TAKE_EDGE and buy_b > 0:
                 q = min(-od.sell_orders[price], buy_b)
@@ -169,13 +199,14 @@ class Trader:
                     if q > 0: orders.append(Order(P, price, q)); buy_b -= q; pos += q
                 else: break
 
-        # MAKE — static spread (NOT penny-jump — Lakshan proved it fails on TOMATOES)
-        skew = round(pos * 0.15)
-        bid_price = fair - 6 - skew
-        ask_price = fair + 6 - skew
+        # MAKE with dynamic spread
+        # Time-decay skew: flatten more as session progresses
+        skew = round(pos * T_SKEW * (1 + (1 - t_frac)))  # skew increases toward end
+        bid_price = fair - spread - skew
+        ask_price = fair + spread - skew
 
-        if pos >= 40: buy_b = 0
-        if pos <= -40: sell_b = 0
+        if pos >= T_HARD_LIM: buy_b = 0
+        if pos <= -T_HARD_LIM: sell_b = 0
 
         if buy_b > 0:
             l1 = max(1, int(buy_b * 0.65)); l2 = buy_b - l1
