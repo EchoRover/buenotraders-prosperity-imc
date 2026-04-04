@@ -17,6 +17,9 @@ All models, their scores, and what changed. Single source of truth.
 | **e1_v4** | 23,764 | 12,184 | 11,580 | **1,232** | 558 | 674 | identical to v1 live |
 | **e1_v5** | 28,754 | 14,420 | 14,334 | **1,650** | 867 | 783 | penny-jump works! CLEAR too aggressive on T |
 | e1_p3 | 23,756 | 14,420 | 9,335 | **1,523** | 867 | 656 | trend-riding hurt TOMATOES |
+| e1_v6 | 23,268 | 8,339 | 14,929 | **1,580** | 624 | 956 | asymmetric E = BAD |
+| **e1_v7** | 29,349 | 14,420 | 14,929 | **1,823** | 867 | 956 | best so far |
+| **e1_v8** | — | — | — | **???** | ??? | ??? | **LADDOO base + fade only** |
 
 ## Key Insight: v2 is NOT better than v1 live
 
