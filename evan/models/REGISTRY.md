@@ -15,6 +15,8 @@ All models, their scores, and what changed. Single source of truth.
 | e1_p2 | — | — | — | -24 | -8 | -16 | **Fair value ≈ mid-price** |
 | **e1_v3** | 13,625 | 2,140 | 11,485 | **863** | 189 | 674 | limit=80 good, E_SPREAD=1 BAD |
 | **e1_v4** | 23,764 | 12,184 | 11,580 | **1,232** | 558 | 674 | identical to v1 live |
+| **e1_v5** | 28,754 | 14,420 | 14,334 | **1,650** | 867 | 783 | penny-jump works! CLEAR too aggressive on T |
+| e1_p3 | 23,756 | 14,420 | 9,335 | **1,523** | 867 | 656 | trend-riding hurt TOMATOES |
 
 ## Key Insight: v2 is NOT better than v1 live
 

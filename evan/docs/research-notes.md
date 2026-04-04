@@ -6,6 +6,38 @@ Market analysis, data exploration, external references, and findings.
 
 ## 2026-04-03 — Community Intel & Critical Findings
 
+### Discord Intel — Competitive Landscape (2026-04-04)
+
+**Portal scores (real submissions, not backtester):**
+| Player | Portal Score | Backtester | Notes |
+|---|---|---|---|
+| Mr. Nobody | **3,119** | 34,000+ | "simple market making + unwinding/flattening" |
+| Mrinmoy_Banik | 2,994 | — | |
+| Ethan | 2,840 | 32,800 | |
+| Someone | 3,200+ | — | highest seen |
+| "Untuned strat" | ~2,700-2,800 | — | benchmark per community |
+| **Us (e1_v1)** | **1,232** | 23,671 | need massive improvement |
+
+**Ideal EMERALDS PnL: 1,050** (per Ethan, confirmed top player)
+- Our teammates get 867 (with limit=50)
+- With limit=80, we should beat 1,050
+
+**Key community insights:**
+- "Testing dataset is 10x longer" — portal runs ~2,000 ticks, full round runs ~20,000
+- "if your submission shows 3k you'll prob get ~30k on testing" — portal score × 10 ≈ full round score
+- "Overfitting" warning — backtester PnL ≠ portal PnL, careful with tuning
+- "On submission day price of tomatoes also moves against you if you take a lot of orders" — market impact exists
+- Mr. Nobody gets 3,119 with "just simple market making + unwinding/flattening" — CLEAR is the key
+- Visualizer: https://kevin-fu1.github.io/imc-prosperity-4-visualizer/visualizer
+
+**What this means for us:**
+- 3,000+ is very achievable with proper techniques
+- We're 1,800 below the top — EMERALDS gap (558 vs 1,050) = 492, TOMATOES gap = ~1,300
+- "Simple market making + unwinding" = penny-jump + CLEAR + basic fair value. That's it.
+- The benchmark "untuned" score is 2,700. We're at 1,232. We're severely underperforming.
+
+---
+
 ### PROBE e1_p1 RESULTS (submission 45834, limit=50 version)
 
 **EMERALDS — fills ONLY at fair±1:**

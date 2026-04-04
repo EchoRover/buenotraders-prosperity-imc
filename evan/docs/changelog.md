@@ -73,6 +73,60 @@ Chronological record of all significant project changes.
   - Backtest: 23,764 (v1 = 23,671). TOMATOES more consistent across days (5,447 vs 4,908 on trending day)
   - **LIVE: 1,232** (identical to v1). Imbalance signal had no net effect.
 - Deep analysis of all 4 versions + Arjun — see `docs/strategy-log.md`
+
+## 2026-04-04
+- Analyzed 3 teammate algos that BEAT our score:
+  - LADDOO L2: **2,102** (E: 867, T: 1,235) — best overall
+  - trader_v3: 1,247 (E: 867, T: 380)
+  - trader_v4: 1,445 (E: 867, T: 578)
+  - ALL three get EMERALDS 867 vs our 558 — using **penny-jumping + CLEAR phase**
+  - LADDOO gets TOMATOES 1,235 vs our 674 — using ensemble fair value + ultra-low skew
+- **Previous "ceiling" analysis was WRONG** — 1,232 is not the ceiling, 2,100+ is achievable
+- Key techniques we were missing:
+  1. Penny-jumping: post 1 tick better than best bot bid/ask (gets front of queue)
+  2. CLEAR phase: sell into bids at fair value to flatten inventory and free capacity
+  3. 2-layer quoting: 65% at tight level, 35% at wider backup
+  4. Ultra-low TOMATO skew (0.01) with ensemble fair value
+- Ran 4 parallel research agents:
+  1. Optimal market making (Avellaneda-Stoikov, GLFT asymmetric spreads)
+  2. Order flow signals (OFI tick-to-tick, microprice, regime detection)
+  3. Unconventional edges (spread bimodality, bot symmetry, end-of-day optimization)
+  4. Winning team actual source code (pending)
+- Created `docs/v5_plan.md` — comprehensive plan targeting 3,000+
+  - Tier 1: penny-jump + CLEAR + low skew + limit=80 (proven by teammates)
+  - Tier 2: OFI, spread regime detection, multi-level microprice (novel signals)
+  - Tier 3: Avellaneda-Stoikov, end-of-day bias, autocorrelation (advanced)
+- 4th researcher returned with actual source code from 5 winning teams:
+  - Frankfurt Hedgehogs (2nd P3), Linear Utility (2nd P2), Alpha Animals (9th P3), Stanford Cardinal (2nd P1), pe049395 (13th P2)
+  - Reference code saved in `userdatadump/reference_code/`
+  - Key patterns: 3-phase TAKE→CLEAR→MAKE pipeline, adverse volume filter=15, reversion_beta=-0.229, penny-jump only vol>1
+  - Updated `docs/v5_plan.md` with winning team code patterns
+- Discord intel gathered:
+  - Top portal scores: 3,200+ (highest), 3,119, 2,994, 2,840
+  - Ideal EMERALDS PnL: 1,050 (we get 558)
+  - "Untuned" benchmark: 2,700-2,800 — we're at 1,232 which is severely below average
+  - Mr. Nobody gets 3,119 with "simple market making + unwinding/flattening" — confirms CLEAR is the key
+  - Visualizer: kevin-fu1.github.io/imc-prosperity-4-visualizer/visualizer
+- Deep data analysis session (all 12 submissions analyzed):
+  - **EMERALDS: position spiral is the killer** — v5 gets stuck at -31, misses 39/59 taker events
+    - Penny-jump sells at 10007 accumulate short position
+    - CLEAR only works during opposite taker events (29 of 59)
+    - Asymmetric fill distribution causes one-sided spiral
+    - Hypothesis: dual-level (9993 bid / 10001 ask) prevents spiral
+  - **TOMATOES: v5 position stuck at -90!** — way past limit, 96% of time short
+    - LADDOO ranges [-54, +16], 35% long / 64% short — much more balanced
+    - Our spread captured: 2.4 per trip. LADDOO: 4.9 — DOUBLE
+  - **Volume imbalance predicts TOMATO direction 83.3% of the time** — massive unused signal
+  - **Lag-1 autocorrelation = -0.44** — strong mean reversion, should fade every move
+  - **Spread bimodal**: 94% at 13-14, 6% at 5-8 (taker events = strongest signals)
+- Created `e1_v5.py` — full rebuild with all proven techniques:
+  - EMERALDS: penny-jump + CLEAR + limit=80 + 2-layer 65/35
+  - TOMATOES: low skew (0.03) + CLEAR + linreg + 2-layer + limit=80
+  - Backtest: 28,754 (+21% vs v1's 23,671). EMERALDS 14,420, TOMATOES 14,334
+- Created `e1_p3.py` — experimental trend-riding TOMATOES:
+  - Detects trend via 100-tick price change, biases quotes in trend direction
+  - Holds directional positions instead of flattening when trend is detected
+  - Backtest: 23,756 (lower than v5 — backtester favors market making)
 - Restructured project folders:
   - `models/` — all trader algorithms + `REGISTRY.md` (score tracking)
   - `logs/` — competition log dumps with clear naming
